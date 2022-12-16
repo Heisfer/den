@@ -19,6 +19,7 @@ COPY --from=mhs-builder /go/bin/mhsendmail /usr/local/bin/mhsendmail
 
 # Install PHP Extensions required by Magento OS, Adobe Commerce, and the UCT (pcntl)
 RUN chmod +x /usr/local/bin/install-php-extensions && install-php-extensions \
+    apcu \
     amqp \
     bcmath \
     calendar \
@@ -63,6 +64,9 @@ RUN apk --no-cache add \
     pwgen \
     openssh
 
+# Add Cron
+RUN apk --no-cache add busybox-openrc || apk --no-cache add busybox-initscripts
+
 # Bring in the files
 COPY docker-entrypoint /usr/local/bin/
 COPY etc/profile.d/*.sh /etc/profile.d/
@@ -75,9 +79,15 @@ COPY --from=composer:1 /usr/bin/composer /usr/bin/composer1
 COPY --from=composer:2.2 /usr/bin/composer /usr/bin/composer2lts
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer2
 
+# If PHP < 7.2
 RUN if [[ $(printf "7.2\n${PHP_VERSION}" | sort -g | head -n1) != "7.2" ]]; \
     then mv /usr/bin/composer2lts /usr/bin/composer2; fi
 
+# If PHP >= 7.1
+RUN if [[ $(printf "7.1\n${PHP_VERSION}" | sort -g | head -n1) == "7.1" ]]; \
+    then apk --no-cache add mariadb-connector-c; fi
+
+# If PHP >= 7.2
 RUN if [[ $(printf "7.2\n${PHP_VERSION}" | sort -g | head -n1) == "7.2" ]]; \
     then apk --no-cache add composer-zsh-completion; fi
 
